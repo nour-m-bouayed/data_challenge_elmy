@@ -1,14 +1,15 @@
-from xgboost import XGBRegressor
+from xgboost import XGBRegressor, XGBClassifier
 
-MyModel = XGBRegressor(
-    n_estimators=1000,
-    learning_rate=0.05,
-    n_jobs=-1,
-    random_state=0,
-    max_depth=3,
-    colsample_bytree=0.7,
-    subsample=0.7,
-    reg_alpha=0.5,
-    reg_lambda=0.5,
-    tree_method="gpu_hist",
-)
+def build_model(type='regression', lag_features=False):
+    
+    if type == 'regression':
+        parent = XGBRegressor
+    elif type == 'classification':
+        parent = XGBClassifier
+
+    class MyModel(parent):
+        def predict(self, X):
+            return super().predict(X)
+        
+    return MyModel(n_estimators=100, learning_rate=0.1, n_jobs=-1, alpha=0.1, reg_lambda=0.1, max_depth=3,)
+        
