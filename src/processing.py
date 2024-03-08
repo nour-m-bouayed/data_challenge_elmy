@@ -6,7 +6,7 @@ import warnings
 
 warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
 
-def process_features(x_train, x_test,remove_trend=False, lag_features=False):
+def process_features(x_train, x_test, remove_trend=False, lag_features=False):
 
     x_train_processed = x_train.copy()
     x_test_processed = x_test.copy()
