@@ -100,6 +100,7 @@ def impute_na(df, plot=False, trend_degree=9, seasonality_nb_freqs=4):
         original_df_indices (ndarray) : indices of rows in `df_imputed` mapping to original df rows
     '''
     df_temp = df.copy()
+    df_temp = df_temp.set_index(pd.to_datetime(df_temp.index, utc=True))
     df_temp['original'] = 1
     df_temp = df_temp.resample('1h').mean()
     original_df_indices = np.where(df_temp['original'] == 1)
