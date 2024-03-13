@@ -93,7 +93,7 @@ def get_hours_from_date(time_index, date):
     return hours_list
 
 # function to perform missing values imputation
-def impute_na(df, plot=False, trend_degree=9, seasonality_nb_freqs=4):
+def impute_na(df, nonnegative=True, plot=False, trend_degree=9, seasonality_nb_freqs=4):
     '''
     Returns :
         df_imputed (DataFrame) : df resampled at '1h' intervals, without NaNs
@@ -139,7 +139,7 @@ def impute_na(df, plot=False, trend_degree=9, seasonality_nb_freqs=4):
                 hours_list = get_hours_from_date(df_temp.loc[null_patches[i],:].index, signal.index[0])
                 A_matrix_na = build_matrix_harmonic_reg(freqs, hours_list)
                 df_temp.loc[null_patches[i], column] = df_temp.loc[null_patches[i], f'trend_{column}'] + A_matrix_na @ reg_coeffs
-                df_temp.loc[null_patches[i], column] = df_temp.loc[null_patches[i], column].apply(relu)
+                df_temp.loc[null_patches[i], column] = df_temp.loc[null_patches[i], column].apply(relu) if nonnegative else df_temp.loc[null_patches[i], column]
             if plot:
                 plt.figure(figsize=(30,5))
                 plt.plot(df_temp[column])
@@ -159,9 +159,9 @@ def impute_na(df, plot=False, trend_degree=9, seasonality_nb_freqs=4):
                 plt.title(f'{column}')
     df_temp.drop(cols_to_drop, axis=1, inplace=True)
     
-    return df_temp, original_df_indices
+    return df_temp, original_df_indices[0]
 
-def process_features(x_train, x_test, remove_trend=False, lag_features=False):
+def process_features(x_train, x_test, remove_trend=False, lag_features=False, impute_nan=False):
 
     x_train_processed = x_train.copy()
     x_test_processed = x_test.copy()
@@ -172,13 +172,21 @@ def process_features(x_train, x_test, remove_trend=False, lag_features=False):
         x_test_trend = x_test_processed.rolling(window=24).mean()
         x_train_processed = x_train_processed - x_train_trend
         x_test_processed = x_test_processed - x_test_trend
+    
+    if impute_nan:
+        x_train_processed, original_x_train_indices = impute_na(x_train_processed)
+        x_test_processed, original_x_test_indices = impute_na(x_test_processed)
+    
+    # CONSO-PROD ------------------------------------------------
+    x_train_processed['conso_prod_delta'] = x_train_processed['load_forecast'] - x_train_processed['coal_power_available'] - x_train_processed['nucelear_power_available'] - x_train_processed['solar_power_forecasts_average'] - x_train_processed['wind_power_forecasts_average']
+    x_test_processed['conso_prod_delta'] = x_test_processed['load_forecast'] - x_test_processed['coal_power_available'] - x_test_processed['nucelear_power_available'] - x_test_processed['solar_power_forecasts_average'] - x_test_processed['wind_power_forecasts_average']
 
     scaler = StandardScaler()
-    x_train_processed = scaler.fit_transform(x_train_processed)
-    x_test_processed = scaler.transform(x_test_processed)
+    x_train_processed_np = scaler.fit_transform(x_train_processed)
+    x_test_processed_np = scaler.transform(x_test_processed)
 
-    x_train_processed = pd.DataFrame(x_train_processed, index=x_train.index, columns=x_train.columns)
-    x_test_processed = pd.DataFrame(x_test_processed, index=x_test.index, columns=x_test.columns)
+    x_train_processed = pd.DataFrame(x_train_processed_np, index=x_train_processed.index, columns=x_train_processed.columns)
+    x_test_processed = pd.DataFrame(x_test_processed_np, index=x_test_processed.index, columns=x_test_processed.columns)
 
     x_train_processed.drop(columns=["predicted_spot_price"], inplace=True)
     x_test_processed.drop(columns=["predicted_spot_price"], inplace=True)
@@ -198,24 +206,38 @@ def process_features(x_train, x_test, remove_trend=False, lag_features=False):
     # Add categorical calendar features 
     train_date= pd.to_datetime(x_train_processed.index,utc=True)
     test_date = pd.to_datetime(x_test_processed.index,utc=True)
+    # x_train_processed["month"] = train_date.month
+    x_train_processed["month_rad"] = (2*np.pi*train_date.month/12) % (2*np.pi)
+    # x_test_processed["month"] = test_date.month
+    x_test_processed["month_rad"] = (2*np.pi*test_date.month/12) % (2*np.pi)
 
-    x_train_processed["month"] = train_date.month
-    x_test_processed["month"] = test_date.month
+    # x_train_processed["hour"] = train_date.hour
+    # x_test_processed["hour"] = test_date.hour
+    x_train_processed["hour_rad"] = (2*np.pi*train_date.hour/24) % (2*np.pi)
+    x_test_processed["hour_rad"] = (2*np.pi*test_date.hour/24) % (2*np.pi)
 
-    x_train_processed["hour"] = train_date.hour
-    x_test_processed["hour"] = test_date.hour
+    # x_train_processed["weekday"] = train_date.weekday
+    # x_test_processed["weekday"] = test_date.weekday
+    x_train_processed["weekday_rad"] = (2*np.pi*train_date.weekday/7) % (2*np.pi)
+    x_test_processed["weekday_rad"] = (2*np.pi*test_date.weekday/7) % (2*np.pi)
 
-    x_train_processed["weekday"] = train_date.weekday
-    x_test_processed["weekday"] = test_date.weekday
+    # x_train_processed["dayofyear"] = train_date.dayofyear
+    # x_test_processed["dayofyear"] = test_date.dayofyear
+    x_train_processed["dayofyear_rad"] = (2*np.pi*train_date.dayofyear/365) % (2*np.pi)
+    x_test_processed["dayofyear_rad"] = (2*np.pi*test_date.dayofyear/365) % (2*np.pi)
 
-    x_train_processed["dayofyear"] = train_date.dayofyear
-    x_test_processed["dayofyear"] = test_date.dayofyear
-
-
+    if impute_nan:
+        return x_train_processed, x_test_processed, original_x_train_indices, original_x_test_indices 
     return x_train_processed, x_test_processed
 
 
-def process_target(y_train, binarize=False):
+def process_target(y_train, binarize=False,  impute_nan=False):
     if binarize:
         y_train = (y_train >= 0).astype(int)
+        
+    if impute_nan:
+        y_train, original_y_train_indices = impute_na(y_train, nonnegative=False)
+        return y_train, original_y_train_indices
+    
     return y_train
+
