@@ -6,6 +6,7 @@ import numpy as np
 import warnings
 
 warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
+np.seterr(invalid='ignore')
 
 def build_matrix_harmonic_reg(freqs, time_array):
     A_matrix = np.array([(np.cos(2 * np.pi * fi * time_array), np.sin(2 * np.pi * fi * time_array)) for fi in freqs])
