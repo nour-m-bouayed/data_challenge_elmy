@@ -8,7 +8,7 @@ def evaluate(model, features, target, indices=None):
         print(predictions.shape)
         predictions = predictions[indices]
         target = target.iloc[indices]
-    return metrics.weighted_accuracy(predictions, target)
+    return metrics.weighted_accuracy(target,predictions)
 
 
 def evaluate_forecaster(model, features, target, indices=None):
@@ -17,4 +17,4 @@ def evaluate_forecaster(model, features, target, indices=None):
     if indices is not None:
         predictions = predictions[indices]
         target = target.iloc[indices]
-    return metrics.weighted_accuracy(predictions, target)
+    return metrics.weighted_accuracy(target,predictions)
