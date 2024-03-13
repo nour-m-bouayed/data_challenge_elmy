@@ -150,7 +150,7 @@ def impute_na(df, nonnegative=True, plot=False, trend_degree=9, seasonality_nb_f
         except:
             #print(f"Could not decompose {column} into trend/seasonality, doing simple interpolation")
             null_indices, null_patches, non_null_patches, _, _ = partition_na(df_temp[column])
-            df_temp[column] = df_temp[column].fillna(method = 'ffill')
+            df_temp[column] = df_temp[column].ffill()
 
             if plot:
                 plt.figure(figsize=(30,5))
@@ -189,12 +189,6 @@ def process_features(x_train, x_test, remove_trend=False, lag_features=False, im
     x_train_processed = pd.DataFrame(x_train_processed_np, index=x_train_processed.index, columns=x_train_processed.columns)
     x_test_processed = pd.DataFrame(x_test_processed_np, index=x_test_processed.index, columns=x_test_processed.columns)
 
-    x_train_processed.drop(columns=["predicted_spot_price"], inplace=True)
-    x_test_processed.drop(columns=["predicted_spot_price"], inplace=True)
-
-    x_train_processed.ffill(inplace=True)
-    x_test_processed.ffill(inplace=True)
-
     # Augment features with lagged values
     if lag_features:
         column_names = x_train_processed.columns
@@ -229,16 +223,16 @@ def process_features(x_train, x_test, remove_trend=False, lag_features=False, im
 
     if impute_nan:
         return x_train_processed, x_test_processed, original_x_train_indices, original_x_test_indices 
-    return x_train_processed, x_test_processed
+    return x_train_processed, x_test_processed, None, None
 
 
 def process_target(y_train, binarize=False,  impute_nan=False):
-    if binarize:
-        y_train = (y_train >= 0).astype(int)
-        
     if impute_nan:
         y_train, original_y_train_indices = impute_na(y_train, nonnegative=False)
-        return y_train, original_y_train_indices
-    
-    return y_train
+    else:
+        original_y_train_indices = None
 
+    if binarize:
+        y_train = (y_train >= 0).astype(int)
+    
+    return y_train, original_y_train_indices

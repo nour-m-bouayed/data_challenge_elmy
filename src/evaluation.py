@@ -4,8 +4,9 @@ import darts
 def evaluate(model, features, target, indices=None):
     predictions = model.predict(features)
     if indices is not None:
-        #print(indices)
-        #print(predictions.shape)
+        print(predictions.shape)
+        print(target.shape)
+        print(indices)
         predictions = predictions[indices]
         target = target.iloc[indices]
     return metrics.weighted_accuracy(target,predictions)
