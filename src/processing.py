@@ -108,7 +108,7 @@ def impute_na(df, plot=False, trend_degree=9, seasonality_nb_freqs=4):
     na_columns = df_temp.columns[df_temp.isna().sum()>0]
     cols_to_drop = ['original']
     for column in na_columns:
-        print('COLUMN : ', column)
+        #print('COLUMN : ', column)
         try:
             # Get trend of column signal
             signal = df_temp[column].interpolate()
@@ -147,7 +147,7 @@ def impute_na(df, plot=False, trend_degree=9, seasonality_nb_freqs=4):
                     plt.plot(df_temp.loc[patch,column], color='red')
                 plt.title(f'{column}')
         except:
-            print(f"Could not decompose {column} into trend/seasonality, doing simple interpolation")
+            #print(f"Could not decompose {column} into trend/seasonality, doing simple interpolation")
             null_indices, null_patches, non_null_patches, _, _ = partition_na(df_temp[column])
             df_temp[column] = df_temp[column].fillna(method = 'ffill')
 
@@ -192,6 +192,8 @@ def process_features(x_train, x_test, remove_trend=False, lag_features=False):
 
         x_train_processed = pd.concat({column + "_lag" + str(i): x_train_processed[column].shift(i) for column in column_names for i in range(-12, 12)}, axis=1)
         x_test_processed = pd.concat({column + "_lag" + str(i): x_test_processed[column].shift(i) for column in column_names for i in range(-12, 12)}, axis=1)
+        #x_train_processed,_ = impute_na(x_train_processed, plot=False, trend_degree=9, seasonality_nb_freqs=4)
+        #x_test_processed,_ = impute_na(x_test_processed, plot=False, trend_degree=9, seasonality_nb_freqs=4)
 
     # Add categorical calendar features 
     train_date= pd.to_datetime(x_train_processed.index,utc=True)
