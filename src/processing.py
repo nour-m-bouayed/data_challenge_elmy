@@ -4,8 +4,9 @@ import matplotlib.pyplot as plt
 from scipy.signal import argrelmax
 import numpy as np
 import warnings
-
+from sklearn.exceptions import DataConversionWarning
 warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
+warnings.simplefilter(action='ignore', category=DataConversionWarning)
 np.seterr(invalid='ignore')
 
 def build_matrix_harmonic_reg(freqs, time_array):
