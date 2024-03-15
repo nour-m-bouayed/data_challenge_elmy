@@ -1,13 +1,14 @@
 from xgboost import XGBRegressor, XGBClassifier
 from darts.models import RNNModel, LinearRegressionModel
-from sklearn.ensemble import HistGradientBoostingClassifier
+from sklearn.ensemble import HistGradientBoostingClassifier, HistGradientBoostingRegressor
 
 def build_model(type='regression', lag_features=False):
     
-    if type == 'regression':
-        parent = XGBRegressor
-    elif type == 'classification':
+    if type == 'classification':
         parent = HistGradientBoostingClassifier
+    elif type == 'regression':
+        parent = HistGradientBoostingRegressor
+        type = 'classification'
     elif type == 'forecaster':
         return build_forecaster()
 

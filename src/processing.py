@@ -3,6 +3,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.signal import argrelmax
 import numpy as np
+
+from jours_feries_france import JoursFeries
+from datetime import datetime
+from suntimes import SunTimes  
+
 import warnings
 from sklearn.exceptions import DataConversionWarning
 warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
@@ -110,7 +115,7 @@ def impute_na(df, nonnegative=True, plot=False, trend_degree=9, seasonality_nb_f
     na_columns = df_temp.columns[df_temp.isna().sum()>0]
     cols_to_drop = ['original']
     for column in na_columns:
-        print('COLUMN : ', column)
+        #print('COLUMN : ', column)
         try:
             # Get trend of column signal
             signal = df_temp[column].interpolate()
@@ -149,7 +154,7 @@ def impute_na(df, nonnegative=True, plot=False, trend_degree=9, seasonality_nb_f
                     plt.plot(df_temp.loc[patch,column], color='red')
                 plt.title(f'{column}')
         except:
-            print(f"Could not decompose {column} into trend/seasonality, doing simple interpolation")
+            #print(f"Could not decompose {column} into trend/seasonality, doing simple interpolation")
             null_indices, null_patches, non_null_patches, _, _ = partition_na(df_temp[column])
             df_temp[column] = df_temp[column].ffill()
 
@@ -166,8 +171,11 @@ def impute_na(df, nonnegative=True, plot=False, trend_degree=9, seasonality_nb_f
 def process_features(x_train, x_test=None, remove_trend=False, lag_features=False, impute_nan=False):
 
     x_train_processed = x_train.copy()
+
+    x_train_processed = x_train_processed.set_index(pd.to_datetime(x_train_processed.index, utc=True))
     if x_test is not None:
         x_test_processed = x_test.copy()
+        x_test_processed = x_test_processed.set_index(pd.to_datetime(x_test_processed.index, utc=True))
 
     # Compute the rolling mean of each feature and subtract it from the original feature
     if remove_trend:
@@ -234,11 +242,48 @@ def process_features(x_train, x_test=None, remove_trend=False, lag_features=Fals
     x_train_processed["dayofyear_rad"] = (2*np.pi*train_date.dayofyear/365) % (2*np.pi)
     if x_test is not None:
         x_test_processed["dayofyear_rad"] = (2*np.pi*test_date.dayofyear/365) % (2*np.pi)
+
+    paris = SunTimes(2.349902, 48.852968, 35)
+
+    x_train_processed['sunrise'] = x_train_processed.index.map(lambda x: paris.riseutc(x))
+    x_train_processed['sunset'] = x_train_processed.index.map(lambda x: paris.setutc(x))
+    x_train_processed['sunlight'] = 0
+    x_train_processed.loc[(x_train_processed.index>= x_train_processed.sunrise) & (x_train_processed.index<=x_train_processed.sunset),'sunlight']=1
+    x_train_processed.drop(['sunrise','sunset'], axis=1, inplace=True)
+
+    x_test_processed['sunrise'] = x_test_processed.index.map(lambda x: paris.riseutc(x))
+    x_test_processed['sunset'] = x_test_processed.index.map(lambda x: paris.setutc(x))
+    x_test_processed['sunlight'] = 0
+    x_test_processed.loc[(x_test_processed.index>= x_test_processed.sunrise) & (x_test_processed.index<=x_test_processed.sunset),'sunlight']=1
+    x_test_processed.drop(['sunrise','sunset'], axis=1, inplace=True)
+
+    holidays = []
+    for year in [2022, 2023]:
+        holidays += list(JoursFeries.for_year(year).values())
+
+    x_train_processed['holiday'] = 0
+    for holiday in holidays:
+        x_train_processed.loc[x_train_processed.index.date == holiday, 'holiday'] = 1
+
+    x_test_processed['holiday'] = 0
+    for holiday in holidays:
+        x_test_processed.loc[x_test_processed.index.date == holiday, 'holiday'] = 1
+
+    temp = pd.read_csv('data/ods_temperature.csv', encoding='latin-1', sep=';', parse_dates=True)
+    temp.Date = pd.to_datetime(temp.Date, utc=True)
+    temp.set_index('Date', inplace=True)
+    temp = temp.resample('1h').mean().interpolate()
+
+    x_train_processed['temperature'] = temp.loc[x_train_processed.index, 'Température (°C)']
+    x_test_processed['temperature'] = temp.loc[x_test_processed.index, 'Température (°C)']
+    scaler = StandardScaler()
+    x_train_processed['temperature'] = scaler.fit_transform(pd.DataFrame(x_train_processed['temperature']))
+    x_test_processed['temperature'] = scaler.transform(pd.DataFrame(x_test_processed['temperature']))
     
     if x_test is not None:
         if impute_nan:
             return x_train_processed, x_test_processed, original_x_train_indices, original_x_test_indices 
-        return x_train_processed, x_test_processed
+        return x_train_processed, x_test_processed, None, None
     if impute_nan:
         return x_train_processed, None, original_x_train_indices, None 
     return x_train_processed, x_test_processed, None, None
@@ -251,6 +296,6 @@ def process_target(y_train, binarize=False,  impute_nan=False):
         original_y_train_indices = None
 
     if binarize:
-        y_train = (y_train >= 0).astype(int)
+        y_train = (y_train > 0).astype(int)
     
     return y_train, original_y_train_indices
