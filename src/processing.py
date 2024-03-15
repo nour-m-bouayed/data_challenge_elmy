@@ -110,7 +110,7 @@ def impute_na(df, nonnegative=True, plot=False, trend_degree=9, seasonality_nb_f
     na_columns = df_temp.columns[df_temp.isna().sum()>0]
     cols_to_drop = ['original']
     for column in na_columns:
-        #print('COLUMN : ', column)
+        print('COLUMN : ', column)
         try:
             # Get trend of column signal
             signal = df_temp[column].interpolate()
@@ -149,7 +149,7 @@ def impute_na(df, nonnegative=True, plot=False, trend_degree=9, seasonality_nb_f
                     plt.plot(df_temp.loc[patch,column], color='red')
                 plt.title(f'{column}')
         except:
-            #print(f"Could not decompose {column} into trend/seasonality, doing simple interpolation")
+            print(f"Could not decompose {column} into trend/seasonality, doing simple interpolation")
             null_indices, null_patches, non_null_patches, _, _ = partition_na(df_temp[column])
             df_temp[column] = df_temp[column].ffill()
 
@@ -197,16 +197,6 @@ def process_features(x_train, x_test=None, remove_trend=False, lag_features=Fals
     if x_test is not None:
         x_test_processed = pd.DataFrame(x_test_processed_np, index=x_test_processed.index, columns=x_test_processed.columns)
 
-<<<<<<< Updated upstream
-=======
-    x_train_processed.drop(columns=["predicted_spot_price"], inplace=True)
-    if x_test is not None:
-        x_test_processed.drop(columns=["predicted_spot_price"], inplace=True)
-
-    x_train_processed.ffill(inplace=True)
-    # x_test_processed.ffill(inplace=True)
-
->>>>>>> Stashed changes
     # Augment features with lagged values
     if lag_features:
         column_names = x_train_processed.columns
@@ -250,13 +240,8 @@ def process_features(x_train, x_test=None, remove_trend=False, lag_features=Fals
             return x_train_processed, x_test_processed, original_x_train_indices, original_x_test_indices 
         return x_train_processed, x_test_processed
     if impute_nan:
-<<<<<<< Updated upstream
-        return x_train_processed, x_test_processed, original_x_train_indices, original_x_test_indices 
+        return x_train_processed, None, original_x_train_indices, None 
     return x_train_processed, x_test_processed, None, None
-=======
-        return x_train_processed, original_x_train_indices,  
-    return x_train_processed
->>>>>>> Stashed changes
 
 
 def process_target(y_train, binarize=False,  impute_nan=False):
