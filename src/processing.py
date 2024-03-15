@@ -110,7 +110,7 @@ def impute_na(df, nonnegative=True, plot=False, trend_degree=9, seasonality_nb_f
     na_columns = df_temp.columns[df_temp.isna().sum()>0]
     cols_to_drop = ['original']
     for column in na_columns:
-        #print('COLUMN : ', column)
+        print('COLUMN : ', column)
         try:
             # Get trend of column signal
             signal = df_temp[column].interpolate()
@@ -149,7 +149,7 @@ def impute_na(df, nonnegative=True, plot=False, trend_degree=9, seasonality_nb_f
                     plt.plot(df_temp.loc[patch,column], color='red')
                 plt.title(f'{column}')
         except:
-            #print(f"Could not decompose {column} into trend/seasonality, doing simple interpolation")
+            print(f"Could not decompose {column} into trend/seasonality, doing simple interpolation")
             null_indices, null_patches, non_null_patches, _, _ = partition_na(df_temp[column])
             df_temp[column] = df_temp[column].ffill()
 
@@ -163,67 +163,84 @@ def impute_na(df, nonnegative=True, plot=False, trend_degree=9, seasonality_nb_f
     
     return df_temp, original_df_indices[0]
 
-def process_features(x_train, x_test, remove_trend=False, lag_features=False, impute_nan=False):
+def process_features(x_train, x_test=None, remove_trend=False, lag_features=False, impute_nan=False):
 
     x_train_processed = x_train.copy()
-    x_test_processed = x_test.copy()
+    if x_test is not None:
+        x_test_processed = x_test.copy()
 
     # Compute the rolling mean of each feature and subtract it from the original feature
     if remove_trend:
         x_train_trend = x_train_processed.rolling(window=24).mean()
-        x_test_trend = x_test_processed.rolling(window=24).mean()
+        if x_test is not None:
+            x_test_trend = x_test_processed.rolling(window=24).mean()
         x_train_processed = x_train_processed - x_train_trend
-        x_test_processed = x_test_processed - x_test_trend
+        if x_test is not None:
+            x_test_processed = x_test_processed - x_test_trend
     
     if impute_nan:
         x_train_processed, original_x_train_indices = impute_na(x_train_processed)
-        x_test_processed, original_x_test_indices = impute_na(x_test_processed)
+        if x_test is not None:
+            x_test_processed, original_x_test_indices = impute_na(x_test_processed)
     
     # CONSO-PROD ------------------------------------------------
     x_train_processed['conso_prod_delta'] = x_train_processed['load_forecast'] - x_train_processed['coal_power_available'] - x_train_processed['nucelear_power_available'] - x_train_processed['solar_power_forecasts_average'] - x_train_processed['wind_power_forecasts_average']
-    x_test_processed['conso_prod_delta'] = x_test_processed['load_forecast'] - x_test_processed['coal_power_available'] - x_test_processed['nucelear_power_available'] - x_test_processed['solar_power_forecasts_average'] - x_test_processed['wind_power_forecasts_average']
+    if x_test is not None:
+        x_test_processed['conso_prod_delta'] = x_test_processed['load_forecast'] - x_test_processed['coal_power_available'] - x_test_processed['nucelear_power_available'] - x_test_processed['solar_power_forecasts_average'] - x_test_processed['wind_power_forecasts_average']
 
     scaler = StandardScaler()
     x_train_processed_np = scaler.fit_transform(x_train_processed)
-    x_test_processed_np = scaler.transform(x_test_processed)
+    if x_test is not None:
+        x_test_processed_np = scaler.transform(x_test_processed)
 
     x_train_processed = pd.DataFrame(x_train_processed_np, index=x_train_processed.index, columns=x_train_processed.columns)
-    x_test_processed = pd.DataFrame(x_test_processed_np, index=x_test_processed.index, columns=x_test_processed.columns)
+    if x_test is not None:
+        x_test_processed = pd.DataFrame(x_test_processed_np, index=x_test_processed.index, columns=x_test_processed.columns)
 
     # Augment features with lagged values
     if lag_features:
         column_names = x_train_processed.columns
 
         x_train_processed = pd.concat({column + "_lag" + str(i): x_train_processed[column].shift(i) for column in column_names for i in range(-12, 12)}, axis=1)
-        x_test_processed = pd.concat({column + "_lag" + str(i): x_test_processed[column].shift(i) for column in column_names for i in range(-12, 12)}, axis=1)
+        if x_test is not None:
+            x_test_processed = pd.concat({column + "_lag" + str(i): x_test_processed[column].shift(i) for column in column_names for i in range(-12, 12)}, axis=1)
         #x_train_processed,_ = impute_na(x_train_processed, plot=False, trend_degree=9, seasonality_nb_freqs=4)
         #x_test_processed,_ = impute_na(x_test_processed, plot=False, trend_degree=9, seasonality_nb_freqs=4)
 
     # Add categorical calendar features 
     train_date= pd.to_datetime(x_train_processed.index,utc=True)
-    test_date = pd.to_datetime(x_test_processed.index,utc=True)
+    if x_test is not None:
+        test_date = pd.to_datetime(x_test_processed.index,utc=True)
     # x_train_processed["month"] = train_date.month
     x_train_processed["month_rad"] = (2*np.pi*train_date.month/12) % (2*np.pi)
     # x_test_processed["month"] = test_date.month
-    x_test_processed["month_rad"] = (2*np.pi*test_date.month/12) % (2*np.pi)
+    if x_test is not None:
+        x_test_processed["month_rad"] = (2*np.pi*test_date.month/12) % (2*np.pi)
 
     # x_train_processed["hour"] = train_date.hour
     # x_test_processed["hour"] = test_date.hour
     x_train_processed["hour_rad"] = (2*np.pi*train_date.hour/24) % (2*np.pi)
-    x_test_processed["hour_rad"] = (2*np.pi*test_date.hour/24) % (2*np.pi)
+    if x_test is not None:
+        x_test_processed["hour_rad"] = (2*np.pi*test_date.hour/24) % (2*np.pi)
 
     # x_train_processed["weekday"] = train_date.weekday
     # x_test_processed["weekday"] = test_date.weekday
     x_train_processed["weekday_rad"] = (2*np.pi*train_date.weekday/7) % (2*np.pi)
-    x_test_processed["weekday_rad"] = (2*np.pi*test_date.weekday/7) % (2*np.pi)
+    if x_test is not None:
+        x_test_processed["weekday_rad"] = (2*np.pi*test_date.weekday/7) % (2*np.pi)
 
     # x_train_processed["dayofyear"] = train_date.dayofyear
     # x_test_processed["dayofyear"] = test_date.dayofyear
     x_train_processed["dayofyear_rad"] = (2*np.pi*train_date.dayofyear/365) % (2*np.pi)
-    x_test_processed["dayofyear_rad"] = (2*np.pi*test_date.dayofyear/365) % (2*np.pi)
-
+    if x_test is not None:
+        x_test_processed["dayofyear_rad"] = (2*np.pi*test_date.dayofyear/365) % (2*np.pi)
+    
+    if x_test is not None:
+        if impute_nan:
+            return x_train_processed, x_test_processed, original_x_train_indices, original_x_test_indices 
+        return x_train_processed, x_test_processed
     if impute_nan:
-        return x_train_processed, x_test_processed, original_x_train_indices, original_x_test_indices 
+        return x_train_processed, None, original_x_train_indices, None 
     return x_train_processed, x_test_processed, None, None
 
 
